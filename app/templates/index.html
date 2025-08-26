@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HAR — HMM vs SVM</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <div class="container">
+      <h1>سیستم تشخیص فعالیت (UCI-HAR) — مقایسه HMM و SVM</h1>
+      <form action="/predict" method="post" enctype="multipart/form-data" class="card">
+        <label>روش را انتخاب کنید:</label>
+        <select name="method">
+          <option value="svm">SVM (ویژگی‌های ۵۶۱تایی)</option>
+          <option value="rf">Random Forest</option>
+          <option value="hmm">HMM (likelihood سکانس نمونه)</option>
+        </select>
+        <label>ورودی:</label>
+        <select name="mode">
+          <option value="sample">نمونه‌ی آماده</option>
+          <option value="upload">بارگذاری CSV (یک ردیف با ۵۶۱ ویژگی)</option>
+        </select>
+        <input type="file" name="file" accept=".csv">
+        <button type="submit">اجرا</button>
+      </form>
+      {% if result %}
+        <div class="card">
+          <h3>نتیجه</h3>
+          <pre>{{ result | tojson(indent=2) }}</pre>
+        </div>
+      {% endif %}
+    </div>
+  </body>
+</html>

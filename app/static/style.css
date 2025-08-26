@@ -1,0 +1,10 @@
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;line-height:1.6;margin:0;background:#f6f7fb}
+.container{max-width:900px;margin:32px auto;padding:0 16px}
+h1{font-size:1.5rem;margin-bottom:16px}
+.card{background:#fff;padding:16px;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,0.08);margin-bottom:16px}
+label{display:block;margin-top:8px;margin-bottom:4px}
+select,input[type=file]{width:100%;padding:10px;border:1px solid #e0e0e0;border-radius:10px}
+button{margin-top:12px;padding:10px 16px;border:0;border-radius:12px;background:#3949ab;color:#fff;font-weight:600;cursor:pointer}
+button:hover{filter:brightness(1.05)}
+pre{white-space:pre-wrap;word-break:break-word;background:#0a0a0a;color:#fff;border-radius:12px;padding:12px}
