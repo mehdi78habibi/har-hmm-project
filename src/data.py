@@ -18,49 +18,46 @@ def download_har(root: str) -> str:
         zf.extractall(root)
     return out_dir
 
-def load_har_features(dataset_dir: str):
+def load_har_features(base_dir):
+    import pandas as pd, os
+    # لیبل‌ها
+    act_path = os.path.join(base_dir, "activity_labels.txt")
+    label_map = pd.read_csv(act_path, sep=r"\s+", header=None, index_col=0)[1].to_dict()
 
-    # هم train/Train و هم test/Test را بپذیر
-    train_dir = os.path.join(dataset_dir, 'train')
-    test_dir  = os.path.join(dataset_dir, 'test')
-    if not os.path.isdir(train_dir): train_dir = os.path.join(dataset_dir, 'Train')
-    if not os.path.isdir(test_dir):  test_dir  = os.path.join(dataset_dir, 'Test')
+    # نام ویژگی‌ها + یکتاسازی (name, name.2, name.3, ...)
+    feat_path = os.path.join(base_dir, "features.txt")
+    feat_names = pd.read_csv(feat_path, sep=r"\s+", header=None, usecols=[1]) \
+                   .squeeze("columns").tolist()
+    from collections import defaultdict
+    seen = defaultdict(int)
+    uniq_names = []
+    for nm in feat_names:
+        seen[nm] += 1
+        uniq_names.append(nm if seen[nm] == 1 else f"{nm}.{seen[nm]}")
 
-    # نام‌گذاری ویژگی‌ها
-    features = pd.read_csv(os.path.join(dataset_dir, "features.txt"),
-                           sep=r"\s+", header=None, names=["idx","name"]).set_index("idx")
-    feat_names = features["name"].tolist()
+    train_dir = os.path.join(base_dir, "train")
+    test_dir  = os.path.join(base_dir, "test")
 
-    # ماتریس‌های ویژگی
+    # X ها را بدون names بخوان و بعداً ستون‌ها را ست کن (سازگار با pandas جدید)
     X_train = pd.read_csv(os.path.join(train_dir, "X_train.txt"),
-                          sep=r"\s+", header=None, names=feat_names)
+                          sep=r"\s+", header=None, engine="python")
+    X_test  = pd.read_csv(os.path.join(test_dir,  "X_test.txt"),
+                          sep=r"\s+", header=None, engine="python")
+    X_train.columns = uniq_names
+    X_test.columns  = uniq_names
+
+    # برچسب‌ها و سابجکت‌ها
     y_train = pd.read_csv(os.path.join(train_dir, "y_train.txt"),
-                          sep=r"\s+", header=None)[0]
+                          sep=r"\s+", header=None).squeeze("columns")
+    y_test  = pd.read_csv(os.path.join(test_dir,  "y_test.txt"),
+                          sep=r"\s+", header=None).squeeze("columns")
+    subj_train = pd.read_csv(os.path.join(train_dir, "subject_train.txt"),
+                             sep=r"\s+", header=None).squeeze("columns")
+    subj_test  = pd.read_csv(os.path.join(test_dir,  "subject_test.txt"),
+                             sep=r"\s+", header=None).squeeze("columns")
+    subjects = {"train": subj_train.values, "test": subj_test.values}
 
-    X_test = pd.read_csv(os.path.join(test_dir, "X_test.txt"),
-                         sep=r"\s+", header=None, names=feat_names)
-    y_test = pd.read_csv(os.path.join(test_dir, "y_test.txt"),
-                         sep=r"\s+", header=None)[0]
-
-    # مسیرهای subject: هم نامِ UCI-HAR (subject_train.txt)
-    # و هم نامِ SBHAR (subject_id_train.txt) را پشتیبانی کن
-    subj_train_path = os.path.join(train_dir, "subject_train.txt")
-    if not os.path.isfile(subj_train_path):
-        subj_train_path = os.path.join(train_dir, "subject_id_train.txt")
-
-    subj_test_path = os.path.join(test_dir, "subject_test.txt")
-    if not os.path.isfile(subj_test_path):
-        subj_test_path = os.path.join(test_dir, "subject_id_test.txt")
-
-    subj_train = pd.read_csv(subj_train_path, sep=r"\s+", header=None)[0].reset_index(drop=True)
-    subj_test  = pd.read_csv(subj_test_path,  sep=r"\s+", header=None)[0].reset_index(drop=True)
-
-    # نگاشت شناسهٔ فعالیت به نام
-    labels = pd.read_csv(os.path.join(dataset_dir, "activity_labels.txt"),
-                         sep=r"\s+", header=None, names=["id","name"]).set_index("id")["name"].to_dict()
-
-    subjects = {"train": subj_train, "test": subj_test}
-    return X_train, y_train, X_test, y_test, subjects, labels
+    return X_train, y_train.values, X_test, y_test.values, subjects, label_map 
 
 
 def build_sequences(X: pd.DataFrame, y: pd.Series, subjects: pd.Series, max_len: int = 25):
