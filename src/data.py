@@ -1,6 +1,41 @@
 import os, zipfile, io, requests
 import numpy as np, pandas as pd
 
+
+def ensure_har_dataset(data_root: str) -> str:
+    """
+    اگر دیتاست UCI-HAR وجود نداشت، آن را دانلود و Extract می‌کند
+    و مسیر فولدر «UCI HAR Dataset» را برمی‌گرداند.
+    """
+    target = os.path.join(data_root, "UCI HAR Dataset")
+    if os.path.isdir(os.path.join(target, "train")):
+        return target
+
+    os.makedirs(data_root, exist_ok=True)
+
+    # می‌توانی در Render متغیر محیطی HAR_URL هم بگذاری؛ وگرنه از لینک UCI استفاده می‌کنیم.
+    url = os.environ.get(
+        "HAR_URL",
+        "https://archive.ics.uci.edu/ml/machine-learning-databases/00240/UCI%20HAR%20Dataset.zip",
+    )
+
+    resp = requests.get(url, timeout=120)
+    resp.raise_for_status()
+    with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+        zf.extractall(data_root)
+
+    # بعضی mirrorها پوشه را با همین نام می‌سازند
+    if os.path.isdir(os.path.join(target, "train")):
+        return target
+    # احتیاط: اگر نامِ پوشه فرق داشت، حدس بزنیم
+    for dn in os.listdir(data_root):
+        cand = os.path.join(data_root, dn)
+        if os.path.isdir(os.path.join(cand, "train")) and \
+           os.path.isfile(os.path.join(cand, "features.txt")):
+            return cand
+    raise RuntimeError("UCI-HAR dataset not found after download!")
+
+
 UCI_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/00240/UCI%20HAR%20Dataset.zip"
 
 def download_har(root: str) -> str:
@@ -18,8 +53,13 @@ def download_har(root: str) -> str:
         zf.extractall(root)
     return out_dir
 
-def load_har_features(base_dir):
-    import pandas as pd, os
+def load_har_features(dataset_dir: str):
+    # اگر مسیر داده‌ها را مستقیم دادی، همان را استفاده می‌کنیم
+    # اما اگر وجود نداشت، دانلودش می‌کنیم
+    if not os.path.isdir(os.path.join(dataset_dir, "train")) and \
+       not os.path.isdir(os.path.join(dataset_dir, "Train")):
+        dataset_dir = ensure_har_dataset(os.path.dirname(dataset_dir))
+
     # لیبل‌ها
     act_path = os.path.join(base_dir, "activity_labels.txt")
     label_map = pd.read_csv(act_path, sep=r"\s+", header=None, index_col=0)[1].to_dict()
@@ -45,6 +85,13 @@ def load_har_features(base_dir):
                           sep=r"\s+", header=None, engine="python")
     X_train.columns = uniq_names
     X_test.columns  = uniq_names
+
+    def _drop_nans(X, y):
+    mask = ~X.isna().any(axis=1)
+    return X.loc[mask], np.asarray(y)[mask]
+
+    X_train, y_train = _drop_nans(X_train, y_train)
+    X_test,  y_test  = _drop_nans(X_test,  y_test)
 
     # برچسب‌ها و سابجکت‌ها
     y_train = pd.read_csv(os.path.join(train_dir, "y_train.txt"),

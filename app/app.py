@@ -35,12 +35,12 @@ RF_MODEL = None
 SCALER = None
 HMM_MODELS = {}
 
+from data import ensure_har_dataset, load_har_features, build_sequences
+
 def train_models():
     global LABEL_MAP, SVM_MODEL, RF_MODEL, SCALER, HMM_MODELS
-    try:
-        ds_dir = download_har(os.path.join(ROOT, 'data'))
-    except Exception:
-        ds_dir = os.path.join(ROOT, 'data', 'UCI HAR Dataset')
+    ds_dir = ensure_har_dataset(os.path.join(ROOT, 'data'))
+    X_train, y_train, X_test, y_test, subjects, label_map = load_har_features(ds_dir)
     X_train, y_train, X_test, y_test, subjects, label_map = load_har_features(ds_dir)
     LABEL_MAP = label_map
     SCALER = StandardScaler().fit(X_train.values)
