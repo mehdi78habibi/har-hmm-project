@@ -21,6 +21,15 @@ from hmmlearn.hmm import GaussianHMM
 
 app = Flask(__name__)
 
+MODELS_READY = False
+
+@app.before_first_request
+def _warmup():
+    global MODELS_READY
+    if not MODELS_READY:
+        train_models()
+        MODELS_READY = True
+
 LABEL_MAP = None
 SVM_MODEL = None
 RF_MODEL = None
