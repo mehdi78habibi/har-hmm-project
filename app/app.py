@@ -62,6 +62,10 @@ def train_models():
         m.fit(data, lengths)
         HMM_MODELS[act_id] = m
 
+@app.route("/healthz", methods=["GET", "HEAD"])
+def healthz():
+    return ("ok", 200)
+
 @app.route('/', methods=['GET'])
 def index():
     ensure_models_ready()
@@ -72,6 +76,15 @@ def predict():
     ensure_models_ready()
     method = request.form.get('method', 'svm')
     mode   = request.form.get('mode', 'sample')
+
+@app.route("/", methods=["GET", "HEAD"])
+def index():
+    # پاسخ فوری به health-check
+    if request.method == "HEAD":
+        return ("", 200)
+
+    ensure_models_ready()   # دانلود دیتاست/آموزش فقط برای GET اجرا شود
+    return render_template("index.html", labels=LABEL_MAP)
 
     try:
         ds_dir = download_har(os.path.join(ROOT, 'data'))
