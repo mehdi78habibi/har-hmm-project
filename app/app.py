@@ -23,8 +23,7 @@ app = Flask(__name__)
 
 MODELS_READY = False
 
-@app.before_first_request
-def _warmup():
+def ensure_models_ready():
     global MODELS_READY
     if not MODELS_READY:
         train_models()
@@ -65,10 +64,12 @@ def train_models():
 
 @app.route('/', methods=['GET'])
 def index():
+    ensure_models_ready()
     return render_template('index.html', labels=LABEL_MAP)
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    ensure_models_ready()
     method = request.form.get('method', 'svm')
     mode   = request.form.get('mode', 'sample')
 
