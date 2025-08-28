@@ -218,6 +218,11 @@ def predict():
     # warming=False یعنی الان نتیجه داریم (برای HMM هم اگر آماده بود)
     return render_template("index.html", labels=LABEL_MAP, result=result, warming=not HMM_READY)
 
+try:
+    # اگر مدل‌های پایه هنوز آماده نیستند، warmup خودش train_base_models را صدا می‌زند
+    Thread(target=warmup_async, daemon=True).start()
+except Exception:
+    pass
 
 # ---------- Local run ----------
 if __name__ == "__main__":
