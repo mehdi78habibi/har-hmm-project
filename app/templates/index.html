@@ -6,37 +6,51 @@
     <title>HAR — HMM vs SVM</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
-    {# وقتی مدل‌ها در حال آماده‌سازی‌اند، هر ۵ ثانیه صفحه رفرش شود #}
-    {% if warming %}
+    {# اگر مدل‌های پایه (SVM/RF) هنوز آماده نیستند، هر ۵ ثانیه رفرش کن #}
+    {% if warming_base %}
       <meta http-equiv="refresh" content="5">
     {% endif %}
+
     <style>
       .note{background:#fff4ce;border:1px solid #ffd24d;padding:12px;border-radius:8px;margin:16px 0}
+      .info{background:#e8f3ff;border:1px solid #bcdcff}
       .muted{opacity:.6;pointer-events:none}
       .labels{columns:2;gap:24px}
-      .labels li{list-style: none;margin:4px 0}
+      .labels li{list-style:none;margin:4px 0}
       .warn{background:#fff4ce;border-color:#ffd24d}
+      .card{background:#fff;border:1px solid #eee;border-radius:10px;padding:16px;margin:16px 0}
+      h1{margin-top:12px}
     </style>
   </head>
   <body>
     <div class="container">
       <h1>سیستم تشخیص فعالیت (UCI-HAR) — مقایسه HMM و SVM</h1>
 
-      {% if warming %}
+      {# ۱) اگر Base آماده نیست: بنر هشدار و رفرش خودکار #}
+      {% if warming_base %}
         <div class="note warn">
-          ⚙️ مدل‌ها در حال آماده‌سازی هستند… معمولاً چند ثانیه طول می‌کشد. صفحه هر ۵ ثانیه به‌روزرسانی می‌شود.
+          ⚙️ مدل‌های پایه (SVM / Random Forest) در حال آماده‌سازی هستند… معمولاً چند ثانیه طول می‌کشد.
+          صفحه هر ۵ ثانیه به‌روزرسانی می‌شود.
+        </div>
+      {% elif not hmm_ready %}
+        {# ۲) اگر Base آماده است ولی HMM نه: فقط اطلاع بده، ورودی‌ها فعال بمانند #}
+        <div class="note info">
+          ℹ️ مدل HMM هنوز در حال آماده‌سازی است. می‌توانید هم‌اکنون از SVM و Random Forest استفاده کنید.
         </div>
       {% endif %}
 
-      {# اگر warming فعال است، ورودی‌ها را غیرفعال کن #}
-      {% set disabled = 'disabled' if warming else '' %}
+      {# وقتی Base آماده نیست، ورودی‌ها را غیرفعال کن #}
+      {% set disabled = 'disabled' if warming_base else '' %}
 
-      <form action="/predict" method="post" enctype="multipart/form-data" class="card {% if warming %}muted{% endif %}">
+      <form action="/predict" method="post" enctype="multipart/form-data" class="card {% if warming_base %}muted{% endif %}">
         <label>روش را انتخاب کنید:</label>
         <select name="method" {{ disabled }}>
           <option value="svm">SVM (ویژگی‌های ۵۶۱تایی)</option>
           <option value="rf">Random Forest</option>
-          <option value="hmm">HMM (likelihood سکانس نمونه)</option>
+          {# اگر HMM آماده نیست، گزینه‌اش را موقتاً غیرفعال کن #}
+          <option value="hmm" {% if not hmm_ready %}disabled{% endif %}>
+            HMM (likelihood سکانس){% if not hmm_ready %} — در حال آماده‌سازی{% endif %}
+          </option>
         </select>
 
         <label>ورودی:</label>
@@ -63,7 +77,7 @@
       {% if result %}
         <div class="card">
           <h3>نتیجه</h3>
-          <pre>{{ result | tojson(indent=2) }}</pre>
+          <pre>{{ result | tojson(indent=2, ensure_ascii=False) }}</pre>
         </div>
       {% endif %}
     </div>

@@ -131,12 +131,15 @@ def healthz():
 @app.route("/", methods=["GET", "HEAD"])
 def index():
     if request.method == "HEAD":
-        # پاسخِ بسیار سریع برای health-check اولیه
         return ("", 200)
 
-    # هیچ آموزش سنکرونی اینجا انجام نشود تا 502 نگیریم
-    return render_template("index.html", labels=LABEL_MAP,
-                           warming=(not BASE_READY or not HMM_READY))
+    # کنترل‌ها را فقط وقتی BASE آماده نیست غیرفعال کنیم
+    return render_template(
+        "index.html",
+        labels=LABEL_MAP,
+        warming_base=(not BASE_READY),
+        hmm_ready=HMM_READY
+    )
 
 
 # ---------- Prediction ----------
@@ -179,16 +182,14 @@ def predict():
     elif method == "hmm":
         # اگر HMM هنوز آماده نیست، پیام warming_up بده
         if not HMM_READY:
-            return render_template(
-                "index.html",
-                labels=LABEL_MAP,
-                warming=True,
-                result={
-                    "method": "hmm",
-                    "status": "warming_up",
-                    "msg": "مدل HMM هنوز در حال آماده‌سازی است. بعداً دوباره امتحان کنید.",
-                },
-            )
+                return render_template(
+                    "index.html",
+                    labels=LABEL_MAP,
+                    result=result,
+                    warming_base=(not BASE_READY),
+                    hmm_ready=HMM_READY
+                )
+
 
         # توالی آزمایشی بساز و بهترین کلاس را با بیشترین log-likelihood برگردان
         test_seqs = build_sequences(Xte, yte, SUBJECTS["test"], max_len=25)
