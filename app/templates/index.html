@@ -5,25 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>HAR — HMM vs SVM</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    {# وقتی مدل‌ها در حال آماده‌سازی‌اند، هر ۵ ثانیه صفحه رفرش شود #}
+    {% if warming %}
+      <meta http-equiv="refresh" content="5">
+    {% endif %}
+    <style>
+      .note{background:#fff4ce;border:1px solid #ffd24d;padding:12px;border-radius:8px;margin:16px 0}
+      .muted{opacity:.6;pointer-events:none}
+      .labels{columns:2;gap:24px}
+      .labels li{list-style: none;margin:4px 0}
+      .warn{background:#fff4ce;border-color:#ffd24d}
+    </style>
   </head>
   <body>
     <div class="container">
       <h1>سیستم تشخیص فعالیت (UCI-HAR) — مقایسه HMM و SVM</h1>
-      <form action="/predict" method="post" enctype="multipart/form-data" class="card">
+
+      {% if warming %}
+        <div class="note warn">
+          ⚙️ مدل‌ها در حال آماده‌سازی هستند… معمولاً چند ثانیه طول می‌کشد. صفحه هر ۵ ثانیه به‌روزرسانی می‌شود.
+        </div>
+      {% endif %}
+
+      {# اگر warming فعال است، ورودی‌ها را غیرفعال کن #}
+      {% set disabled = 'disabled' if warming else '' %}
+
+      <form action="/predict" method="post" enctype="multipart/form-data" class="card {% if warming %}muted{% endif %}">
         <label>روش را انتخاب کنید:</label>
-        <select name="method">
+        <select name="method" {{ disabled }}>
           <option value="svm">SVM (ویژگی‌های ۵۶۱تایی)</option>
           <option value="rf">Random Forest</option>
           <option value="hmm">HMM (likelihood سکانس نمونه)</option>
         </select>
+
         <label>ورودی:</label>
-        <select name="mode">
+        <select name="mode" {{ disabled }}>
           <option value="sample">نمونه‌ی آماده</option>
           <option value="upload">بارگذاری CSV (یک ردیف با ۵۶۱ ویژگی)</option>
         </select>
-        <input type="file" name="file" accept=".csv">
-        <button type="submit">اجرا</button>
+
+        <input type="file" name="file" accept=".csv" {{ disabled }}>
+        <button type="submit" {{ disabled }}>اجرا</button>
       </form>
+
+      {% if labels %}
+        <div class="card">
+          <h3>نگاشت برچسب‌ها</h3>
+          <ul class="labels">
+            {% for k, v in labels.items() %}
+              <li><strong>{{ k }}</strong>: {{ v }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
       {% if result %}
         <div class="card">
           <h3>نتیجه</h3>
