@@ -238,3 +238,9 @@ if __name__ == "__main__":
     ensure_base_ready()
     Thread(target=warmup_async, daemon=True).start()
     app.run(host="0.0.0.0", port=5000, debug=True)
+
+from flask import jsonify
+
+@app.route("/status", methods=["GET"])
+def status():
+    return jsonify({"base_ready": BASE_READY, "hmm_ready": HMM_READY})
