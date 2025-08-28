@@ -133,27 +133,31 @@ def index():
     if request.method == "HEAD":
         return ("", 200)
 
-    # کنترل‌ها را فقط وقتی BASE آماده نیست غیرفعال کنیم
+    # اگر مدل‌های پایه آماده نیستند، اینجا همزمان بساز تا فرم فعال شود
+    ensure_base_ready()
+
+    # اگر BASE_READY True شد، فرم باید فعال باشد
+    disable_controls = not BASE_READY
+    # حتی اگر HMM آماده نباشد فقط بنر نمایش داده شود
+    warming_banner = not HMM_READY
+
     return render_template(
         "index.html",
         labels=LABEL_MAP,
-        warming_base=(not BASE_READY),
-        hmm_ready=HMM_READY
+        disable_controls=disable_controls,
+        warming_banner=warming_banner,
     )
 
 
-# ---------- Prediction ----------
 @app.route("/predict", methods=["POST"])
 def predict():
+    ensure_base_ready()
+
     method = request.form.get("method", "svm")
     mode   = request.form.get("mode", "sample")
 
-    # اگر مدل‌های پایه آماده نیست، فقط بنر warming را نشان بده
-    if not BASE_READY:
-        return render_template("index.html", labels=LABEL_MAP, warming=True)
-
+    # --------- SVM ----------
     if method == "svm":
-        # ورودی: یک ردیف با ۵۶۱ ویژگی
         if mode == "upload":
             file = request.files.get("file")
             if not file:
@@ -166,32 +170,36 @@ def predict():
         yhat = int(SVM_MODEL.predict(X)[0])
         result = {"method": "svm", "pred": yhat, "label": LABEL_MAP.get(yhat, str(yhat))}
 
+    # --------- RF ----------
     elif method == "rf":
         if mode == "upload":
             file = request.files.get("file")
             if not file:
                 return "Upload a CSV with one row of 561 features.", 400
             df = pd.read_csv(file)
-            X = df.values  # بدون اسکیل
+            X = df.values
         else:
             X = Xte.iloc[[0]].values
 
         yhat = int(RF_MODEL.predict(X)[0])
         result = {"method": "rf", "pred": yhat, "label": LABEL_MAP.get(yhat, str(yhat))}
 
+    # --------- HMM ----------
     elif method == "hmm":
-        # اگر HMM هنوز آماده نیست، پیام warming_up بده
         if not HMM_READY:
-                return render_template(
-                    "index.html",
-                    labels=LABEL_MAP,
-                    result=result,
-                    warming_base=(not BASE_READY),
-                    hmm_ready=HMM_READY
-                )
+            # HMM هنوز در حال آماده‌سازی است؛ فرم فعال بماند اما پیام نمایش بده
+            return render_template(
+                "index.html",
+                labels=LABEL_MAP,
+                disable_controls=False,
+                warming_banner=True,
+                result={
+                    "method": "hmm",
+                    "status": "warming_up",
+                    "msg": "مدل HMM هنوز در حال آماده‌سازی است. بعداً دوباره امتحان کنید.",
+                },
+            )
 
-
-        # توالی آزمایشی بساز و بهترین کلاس را با بیشترین log-likelihood برگردان
         test_seqs = build_sequences(Xte, yte, SUBJECTS["test"], max_len=25)
         if not test_seqs:
             return "No sequences available.", 500
@@ -218,9 +226,21 @@ def predict():
     else:
         return "Unknown method.", 400
 
-    # اگر HMM هنوز آماده نیست، warming=True بماند تا بنر نمایش داده شود
-    return render_template("index.html", labels=LABEL_MAP,
-                           result=result, warming=(not HMM_READY))
+    # بعد از predict، فرم فعال بماند؛ فقط اگر HMM آماده نیست بنر را نشان بده
+    return render_template(
+        "index.html",
+        labels=LABEL_MAP,
+        result=result,
+        disable_controls=False,
+        warming_banner=not HMM_READY,
+    )
+
+@app.route("/status")
+def status():
+    return {
+        "BASE_READY": BASE_READY,
+        "HMM_READY": HMM_READY
+    }, 200
 
 
 # --- start warmup thread on import (non-blocking, idempotent) ---
