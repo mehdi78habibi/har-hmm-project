@@ -49,7 +49,7 @@ ytr = None
 def train_base_models():
     """
     دانلود/بارگذاری دیتا، آماده‌سازی، و آموزش SVM و RandomForest
-    (به صورت سریع، تا UI سریعاً بالا بیاید).
+    (غیربلاکینگ برای UI).
     """
     global BASE_READY, LABEL_MAP, SVM_MODEL, RF_MODEL, SCALER
     global Xte, yte, SUBJECTS, Xtr, ytr
@@ -84,7 +84,7 @@ def train_base_models():
 
 def warmup_async():
     """
-    آموزش HMMها در پس‌زمینه تا UI سریع بالا بیاید و در عین حال
+    آموزش HMMها در پس‌زمینه تا UI سریع بالا بیاید و
     شاخه‌ی HMM بعد از کمی صبر آماده شود.
     """
     global HMM_READY, HMM_MODELS
@@ -115,7 +115,7 @@ def warmup_async():
 
 
 def ensure_base_ready():
-    """اگر مدل‌های پایه آماده نیستند، بساز."""
+    """اگر مدل‌های پایه آماده نیستند، بساز (برای اجرای لوکال/پس‌زمینه)."""
     if not BASE_READY:
         train_base_models()
 
@@ -123,7 +123,7 @@ def ensure_base_ready():
 # ---------- Health ----------
 @app.route("/healthz", methods=["GET", "HEAD"])
 def healthz():
-    # اگر پایه‌ها آماده باشند، 200 می‌دهیم (برای health-check کافی است)
+    # پاسخ سریع برای health-check
     return ("ok", 200)
 
 
@@ -134,18 +134,20 @@ def index():
         # پاسخِ بسیار سریع برای health-check اولیه
         return ("", 200)
 
-    ensure_base_ready()
-    # warming=True یعنی HMM هنوز آماده نشده (SVM/RF آماده‌اند)
-    return render_template("index.html", labels=LABEL_MAP, warming=not HMM_READY)
+    # هیچ آموزش سنکرونی اینجا انجام نشود تا 502 نگیریم
+    return render_template("index.html", labels=LABEL_MAP,
+                           warming=(not BASE_READY or not HMM_READY))
 
 
 # ---------- Prediction ----------
 @app.route("/predict", methods=["POST"])
 def predict():
-    ensure_base_ready()
-
     method = request.form.get("method", "svm")
     mode   = request.form.get("mode", "sample")
+
+    # اگر مدل‌های پایه آماده نیست، فقط بنر warming را نشان بده
+    if not BASE_READY:
+        return render_template("index.html", labels=LABEL_MAP, warming=True)
 
     if method == "svm":
         # ورودی: یک ردیف با ۵۶۱ ویژگی
@@ -175,7 +177,7 @@ def predict():
         result = {"method": "rf", "pred": yhat, "label": LABEL_MAP.get(yhat, str(yhat))}
 
     elif method == "hmm":
-        # ---- دقیقا مطابق خواسته‌ت: اگر HMM هنوز آماده نیست پیام warming_up بده ----
+        # اگر HMM هنوز آماده نیست، پیام warming_up بده
         if not HMM_READY:
             return render_template(
                 "index.html",
@@ -215,20 +217,23 @@ def predict():
     else:
         return "Unknown method.", 400
 
-    # warming=False یعنی الان نتیجه داریم (برای HMM هم اگر آماده بود)
-    return render_template("index.html", labels=LABEL_MAP, result=result, warming=not HMM_READY)
+    # اگر HMM هنوز آماده نیست، warming=True بماند تا بنر نمایش داده شود
+    return render_template("index.html", labels=LABEL_MAP,
+                           result=result, warming=(not HMM_READY))
 
+
+# --- start warmup thread on import (non-blocking, idempotent) ---
 try:
-    # اگر مدل‌های پایه هنوز آماده نیستند، warmup خودش train_base_models را صدا می‌زند
+    _WARMUP_STARTED  # اگر قبلاً ست شده، خطا نمی‌دهیم
+except NameError:
+    _WARMUP_STARTED = True
+    # warmup خودش اگر لازم باشد train_base_models را صدا می‌زند
     Thread(target=warmup_async, daemon=True).start()
-except Exception:
-    pass
+
 
 # ---------- Local run ----------
 if __name__ == "__main__":
-    # مدل‌های پایه را همین حالا بساز تا لوکال سریع تست شود
+    # برای اجرای لوکال: پایه‌ها را بساز و HMM را در پس‌زمینه گرم کن
     ensure_base_ready()
-    # HMM را در پس‌زمینه گرم کن
     Thread(target=warmup_async, daemon=True).start()
-
     app.run(host="0.0.0.0", port=5000, debug=True)
